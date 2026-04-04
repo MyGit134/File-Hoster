@@ -1,4 +1,4 @@
-const dropzone = document.getElementById('dropzone');
+п»їconst dropzone = document.getElementById('dropzone');
 const fileInput = document.getElementById('file-input');
 const pickBtn = document.getElementById('pick-btn');
 const uploadBtn = document.getElementById('upload-btn');
@@ -11,8 +11,8 @@ const statSize = document.getElementById('stat-size');
 let queue = [];
 
 function formatBytes(bytes) {
-  if (!bytes) return '0 МБ';
-  const units = ['Б', 'КБ', 'МБ', 'ГБ'];
+  if (!bytes) return '0 РњР‘';
+  const units = ['Р‘', 'РљР‘', 'РњР‘', 'Р“Р‘'];
   let i = 0;
   let value = bytes;
   while (value >= 1024 && i < units.length - 1) {
@@ -30,9 +30,9 @@ function setStatus(message, tone = 'neutral') {
 function setQueue(files) {
   queue = Array.from(files || []);
   if (queue.length) {
-    setStatus(`В очереди: ${queue.length} файл(ов).`);
+    setStatus(`Р’ РѕС‡РµСЂРµРґРё: ${queue.length} С„Р°Р№Р»(РѕРІ).`);
   } else {
-    setStatus('Очередь пуста.');
+    setStatus('РћС‡РµСЂРµРґСЊ РїСѓСЃС‚Р°.');
   }
 }
 
@@ -67,14 +67,14 @@ dropzone.addEventListener('drop', (event) => {
 
 uploadBtn.addEventListener('click', async () => {
   if (!queue.length) {
-    setStatus('Выберите файлы для загрузки.');
+    setStatus('Р’С‹Р±РµСЂРёС‚Рµ С„Р°Р№Р»С‹ РґР»СЏ Р·Р°РіСЂСѓР·РєРё.');
     return;
   }
 
   const formData = new FormData();
   queue.forEach((file) => formData.append('files', file));
 
-  setStatus('Загрузка файлов...');
+  setStatus('Р—Р°РіСЂСѓР·РєР° С„Р°Р№Р»РѕРІ...');
   uploadBtn.disabled = true;
   pickBtn.disabled = true;
 
@@ -86,21 +86,21 @@ uploadBtn.addEventListener('click', async () => {
 
     const result = await response.json();
     if (!response.ok) {
-      throw new Error(result.error || 'Ошибка загрузки');
+      throw new Error(result.error || 'РћС€РёР±РєР° Р·Р°РіСЂСѓР·РєРё');
     }
 
     const accepted = result.accepted?.length || 0;
     const rejected = result.rejected?.length || 0;
-    let message = `Загружено: ${accepted}.`;
+    let message = `Р—Р°РіСЂСѓР¶РµРЅРѕ: ${accepted}.`;
     if (rejected) {
-      message += ` Отклонено: ${rejected}.`;
+      message += ` РћС‚РєР»РѕРЅРµРЅРѕ: ${rejected}.`;
     }
     setStatus(message);
     fileInput.value = '';
     setQueue([]);
     await loadGallery();
   } catch (err) {
-    setStatus(`Ошибка: ${err.message}`);
+    setStatus(`РћС€РёР±РєР°: ${err.message}`);
   } finally {
     uploadBtn.disabled = false;
     pickBtn.disabled = false;
@@ -141,18 +141,18 @@ function createCard(item) {
 
   const meta = document.createElement('div');
   meta.className = 'card-meta';
-  meta.textContent = `${formatBytes(item.size)} • ${new Date(item.uploadedAt).toLocaleString('ru-RU')}`;
+  meta.textContent = `${formatBytes(item.size)} вЂў ${new Date(item.uploadedAt).toLocaleString('ru-RU')}`;
 
   const actions = document.createElement('div');
   actions.className = 'card-actions';
 
   const badge = document.createElement('span');
   badge.className = 'badge';
-  badge.textContent = item.type === 'image' ? 'Фото' : 'Видео';
+  badge.textContent = item.type === 'image' ? 'Р¤РѕС‚Рѕ' : 'Р’РёРґРµРѕ';
 
   const download = document.createElement('a');
   download.className = 'btn';
-  download.textContent = 'Скачать';
+  download.textContent = 'РЎРєР°С‡Р°С‚СЊ';
   download.href = item.downloadUrl;
 
   actions.appendChild(badge);
@@ -176,7 +176,7 @@ async function loadGallery() {
     if (!Array.isArray(items) || items.length === 0) {
       const empty = document.createElement('div');
       empty.className = 'empty';
-      empty.textContent = 'Пока нет загруженных файлов.';
+      empty.textContent = 'РџРѕРєР° РЅРµС‚ Р·Р°РіСЂСѓР¶РµРЅРЅС‹С… С„Р°Р№Р»РѕРІ.';
       gallery.appendChild(empty);
     } else {
       items.forEach((item) => gallery.appendChild(createCard(item)));
@@ -188,10 +188,10 @@ async function loadGallery() {
   } catch (err) {
     const empty = document.createElement('div');
     empty.className = 'empty';
-    empty.textContent = 'Не удалось загрузить список файлов.';
+    empty.textContent = 'РќРµ СѓРґР°Р»РѕСЃСЊ Р·Р°РіСЂСѓР·РёС‚СЊ СЃРїРёСЃРѕРє С„Р°Р№Р»РѕРІ.';
     gallery.appendChild(empty);
   }
 }
 
 loadGallery();
-setStatus('Очередь пуста.');
+setStatus('РћС‡РµСЂРµРґСЊ РїСѓСЃС‚Р°.');

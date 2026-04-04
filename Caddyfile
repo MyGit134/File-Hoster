@@ -1,4 +1,4 @@
-http://media.atalikescookies.xyz {
+﻿http://media.atalikescookies.xyz {
   redir https://media.atalikescookies.xyz{uri}
 }
 
