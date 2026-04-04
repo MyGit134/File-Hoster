@@ -1,0 +1,69 @@
+<!doctype html>
+<html lang="ru">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>File Hoster — Фото и видео</title>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <div class="ambient">
+      <div class="orb orb-a"></div>
+      <div class="orb orb-b"></div>
+      <div class="orb orb-c"></div>
+    </div>
+
+    <main class="page">
+      <header class="hero">
+        <div>
+          <p class="eyebrow">Локальный медиа-хостинг</p>
+          <h1>Загружайте фото и видео, смотрите и скачивайте в одном месте.</h1>
+          <p class="lede">
+            Никакой регистрации — только быстрые превью, аккуратная галерея и единый дамп в архив.
+          </p>
+        </div>
+        <div class="stats" id="stats">
+          <div class="stat">
+            <span class="stat-label">Файлов в коллекции</span>
+            <span class="stat-value" id="stat-count">0</span>
+          </div>
+          <div class="stat">
+            <span class="stat-label">Общий размер</span>
+            <span class="stat-value" id="stat-size">0 МБ</span>
+          </div>
+        </div>
+      </header>
+
+      <section class="upload">
+        <div class="dropzone" id="dropzone">
+          <div>
+            <h2>Перетащите сюда файлы</h2>
+            <p>или выберите фото/видео вручную</p>
+          </div>
+          <div class="drop-actions">
+            <input id="file-input" type="file" accept="image/*,video/*" multiple />
+            <button class="btn primary" id="pick-btn">Выбрать файлы</button>
+            <button class="btn" id="upload-btn">Загрузить</button>
+          </div>
+          <p class="hint">Максимум 20 файлов за раз, до 200 МБ каждый.</p>
+        </div>
+        <div class="upload-status" id="upload-status"></div>
+      </section>
+
+      <section class="actions">
+        <div>
+          <h2>Галерея</h2>
+          <p>Все загруженные файлы доступны для просмотра и скачивания.</p>
+        </div>
+        <div>
+          <button class="btn ghost" id="refresh-btn">Обновить список</button>
+          <a class="btn primary" id="dump-btn" href="/api/dump">Скачать все в ZIP</a>
+        </div>
+      </section>
+
+      <section class="gallery" id="gallery"></section>
+    </main>
+
+    <script src="app.js"></script>
+  </body>
+</html>

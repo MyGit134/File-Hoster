@@ -1,0 +1,8 @@
+http://media.atalikescookies.xyz {
+  redir https://media.atalikescookies.xyz{uri}
+}
+
+media.atalikescookies.xyz {
+  encode zstd gzip
+  reverse_proxy localhost:3000
+}
