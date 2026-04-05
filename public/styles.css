@@ -350,9 +350,16 @@ body {
 
 .card-actions {
   display: flex;
-  justify-content: space-between;
+  justify-content: flex-start;
   align-items: center;
-  gap: 10px;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.card-actions .btn {
+  padding: 8px 14px;
+  font-size: 0.85rem;
+  box-shadow: none;
 }
 
 .badge {
