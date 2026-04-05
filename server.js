@@ -85,6 +85,62 @@ function isAllowedMime(mime) {
   return mime && (mime.startsWith('image/') || mime.startsWith('video/'));
 }
 
+function mimeFromExt(filename) {
+  const ext = path.extname(filename || '').toLowerCase();
+  switch (ext) {
+    case '.jpg':
+    case '.jpeg':
+      return 'image/jpeg';
+    case '.png':
+      return 'image/png';
+    case '.gif':
+      return 'image/gif';
+    case '.webp':
+      return 'image/webp';
+    case '.bmp':
+      return 'image/bmp';
+    case '.tif':
+    case '.tiff':
+      return 'image/tiff';
+    case '.mp4':
+      return 'video/mp4';
+    case '.mov':
+      return 'video/quicktime';
+    case '.webm':
+      return 'video/webm';
+    case '.avi':
+      return 'video/x-msvideo';
+    case '.ogv':
+    case '.ogg':
+      return 'video/ogg';
+    case '.flv':
+      return 'video/x-flv';
+    default:
+      return '';
+  }
+}
+
+async function resolveMimeForItem(item) {
+  const full = path.join(UPLOAD_DIR, item.storedName);
+  let detected = null;
+  try {
+    detected = await detectFromFile(full);
+  } catch (err) {
+    console.error('Detect error (list):', err);
+  }
+
+  let mime = detected?.mime || '';
+  if (!isAllowedMime(mime)) {
+    mime = mimeFromExt(item.storedName) || item.mime || '';
+  }
+  if (!isAllowedMime(mime)) {
+    mime = item.mime || '';
+  }
+
+  const type = mime && mime.startsWith('image/') ? 'image' : 'video';
+  return { mime, type };
+}
+
 function isTokenValid(token) {
   if (!token) return false;
   const left = Buffer.from(String(token));
@@ -108,7 +164,7 @@ function requireAuth(req, res, next) {
 function detectFromBuffer(buffer) {
   if (!buffer || buffer.length < 12) return null;
 
-  const asString = buffer.toString('ascii', 0, 12);
+  const asString = buffer.toString('ascii', 0, Math.min(buffer.length, 4100));
 
   if (buffer[0] === 0xff && buffer[1] === 0xd8 && buffer[2] === 0xff) {
     return { mime: 'image/jpeg', ext: 'jpg' };
@@ -151,8 +207,9 @@ function detectFromBuffer(buffer) {
     return { mime: 'video/webm', ext: 'webm' };
   }
 
-  if (asString.slice(4, 8) === 'ftyp') {
-    const brand = asString.slice(8, 12);
+  const ftypIndex = asString.indexOf('ftyp');
+  if (ftypIndex >= 0 && ftypIndex <= 4092) {
+    const brand = buffer.toString('ascii', ftypIndex + 4, ftypIndex + 8);
     if (brand === 'qt  ') {
       return { mime: 'video/quicktime', ext: 'mov' };
     }
@@ -194,22 +251,32 @@ const upload = multer({
   limits: { fileSize: MAX_FILE_SIZE, files: MAX_FILES_PER_UPLOAD }
 });
 
-app.get('/api/list', requireAuth, (req, res) => {
-  const files = meta.files.filter((item) => {
-    const full = path.join(UPLOAD_DIR, item.storedName);
-    return fs.existsSync(full);
-  });
-  res.json(files.map((item) => ({
-    id: item.id,
-    originalName: item.originalName,
-    storedName: item.storedName,
-    size: item.size,
-    mime: item.mime,
-    uploadedAt: item.uploadedAt,
-    viewUrl: `/api/file/${item.id}`,
-    downloadUrl: `/api/download/${item.id}`,
-    type: item.mime.startsWith('image/') ? 'image' : 'video'
-  })));
+app.get('/api/list', requireAuth, async (req, res, next) => {
+  try {
+    const files = meta.files.filter((item) => {
+      const full = path.join(UPLOAD_DIR, item.storedName);
+      return fs.existsSync(full);
+    });
+
+    const resolved = await Promise.all(files.map(async (item) => {
+      const resolvedMime = await resolveMimeForItem(item);
+      return {
+        id: item.id,
+        originalName: item.originalName,
+        storedName: item.storedName,
+        size: item.size,
+        mime: resolvedMime.mime || item.mime,
+        uploadedAt: item.uploadedAt,
+        viewUrl: `/api/file/${item.id}`,
+        downloadUrl: `/api/download/${item.id}`,
+        type: resolvedMime.type
+      };
+    }));
+
+    res.json(resolved);
+  } catch (err) {
+    next(err);
+  }
 });
 
 app.post('/api/upload', requireAuth, upload.array('files', MAX_FILES_PER_UPLOAD), async (req, res, next) => {
@@ -275,7 +342,7 @@ app.post('/api/upload', requireAuth, upload.array('files', MAX_FILES_PER_UPLOAD)
   }
 });
 
-app.get('/api/file/:id', requireAuth, (req, res) => {
+app.get('/api/file/:id', requireAuth, async (req, res, next) => {
   const item = meta.files.find((f) => f.id === req.params.id);
   if (!item) {
     res.status(404).json({ error: 'Not found' });
@@ -288,10 +355,16 @@ app.get('/api/file/:id', requireAuth, (req, res) => {
     return;
   }
 
-  res.setHeader('Content-Type', item.mime);
-  res.setHeader('Content-Disposition', `inline; filename="${item.originalName}"`);
-  res.setHeader('X-Content-Type-Options', 'nosniff');
-  res.sendFile(full);
+  try {
+    const resolved = await resolveMimeForItem(item);
+    const mime = resolved.mime || item.mime || 'application/octet-stream';
+    res.setHeader('Content-Type', mime);
+    res.setHeader('Content-Disposition', `inline; filename="${item.originalName}"`);
+    res.setHeader('X-Content-Type-Options', 'nosniff');
+    res.sendFile(full);
+  } catch (err) {
+    next(err);
+  }
 });
 
 app.get('/api/download/:id', requireAuth, (req, res) => {
