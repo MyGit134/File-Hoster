@@ -120,6 +120,17 @@ function mimeFromExt(filename) {
   }
 }
 
+function extFromName(filename) {
+  const ext = path.extname(filename || '').toLowerCase();
+  return ext ? ext.slice(1) : '';
+}
+
+function extInfoFromName(filename) {
+  const mime = mimeFromExt(filename);
+  const ext = extFromName(filename);
+  return mime && ext ? { mime, ext } : null;
+}
+
 async function resolveMimeForItem(item) {
   const full = path.join(UPLOAD_DIR, item.storedName);
   let detected = null;
@@ -131,7 +142,7 @@ async function resolveMimeForItem(item) {
 
   let mime = detected?.mime || '';
   if (!isAllowedMime(mime)) {
-    mime = mimeFromExt(item.storedName) || item.mime || '';
+    mime = mimeFromExt(item.storedName) || mimeFromExt(item.originalName) || item.mime || '';
   }
   if (!isAllowedMime(mime)) {
     mime = item.mime || '';
@@ -164,37 +175,50 @@ function requireAuth(req, res, next) {
 function detectFromBuffer(buffer) {
   if (!buffer || buffer.length < 12) return null;
 
-  const asString = buffer.toString('ascii', 0, Math.min(buffer.length, 4100));
-
+  // Images
   if (buffer[0] === 0xff && buffer[1] === 0xd8 && buffer[2] === 0xff) {
     return { mime: 'image/jpeg', ext: 'jpg' };
   }
 
-  if (asString.startsWith('\x89PNG\r\n\x1a\n')) {
+  if (
+    buffer[0] === 0x89 &&
+    buffer[1] === 0x50 &&
+    buffer[2] === 0x4e &&
+    buffer[3] === 0x47 &&
+    buffer[4] === 0x0d &&
+    buffer[5] === 0x0a &&
+    buffer[6] === 0x1a &&
+    buffer[7] === 0x0a
+  ) {
     return { mime: 'image/png', ext: 'png' };
   }
 
-  if (asString.startsWith('GIF87a') || asString.startsWith('GIF89a')) {
+  const head6 = buffer.toString('ascii', 0, 6);
+  if (head6 === 'GIF87a' || head6 === 'GIF89a') {
     return { mime: 'image/gif', ext: 'gif' };
   }
 
-  if (asString.startsWith('BM')) {
+  if (buffer[0] === 0x42 && buffer[1] === 0x4d) {
     return { mime: 'image/bmp', ext: 'bmp' };
   }
 
-  if (asString.startsWith('II*\0') || asString.startsWith('MM\0*')) {
+  if (
+    (buffer[0] === 0x49 && buffer[1] === 0x49 && buffer[2] === 0x2a && buffer[3] === 0x00) ||
+    (buffer[0] === 0x4d && buffer[1] === 0x4d && buffer[2] === 0x00 && buffer[3] === 0x2a)
+  ) {
     return { mime: 'image/tiff', ext: 'tiff' };
   }
 
-  if (asString.startsWith('RIFF') && asString.slice(8, 12) === 'WEBP') {
+  if (buffer.toString('ascii', 0, 4) === 'RIFF' && buffer.toString('ascii', 8, 12) === 'WEBP') {
     return { mime: 'image/webp', ext: 'webp' };
   }
 
-  if (asString.startsWith('RIFF') && asString.slice(8, 12) === 'AVI ') {
+  // Video
+  if (buffer.toString('ascii', 0, 4) === 'RIFF' && buffer.toString('ascii', 8, 12) === 'AVI ') {
     return { mime: 'video/x-msvideo', ext: 'avi' };
   }
 
-  if (asString.startsWith('OggS')) {
+  if (buffer.toString('ascii', 0, 4) === 'OggS') {
     return { mime: 'video/ogg', ext: 'ogv' };
   }
 
@@ -207,16 +231,23 @@ function detectFromBuffer(buffer) {
     return { mime: 'video/webm', ext: 'webm' };
   }
 
-  const ftypIndex = asString.indexOf('ftyp');
-  if (ftypIndex >= 0 && ftypIndex <= 4092) {
-    const brand = buffer.toString('ascii', ftypIndex + 4, ftypIndex + 8);
-    if (brand === 'qt  ') {
-      return { mime: 'video/quicktime', ext: 'mov' };
+  const searchLimit = Math.min(buffer.length - 8, 4096);
+  for (let i = 0; i <= searchLimit; i += 1) {
+    if (
+      buffer[i] === 0x66 &&
+      buffer[i + 1] === 0x74 &&
+      buffer[i + 2] === 0x79 &&
+      buffer[i + 3] === 0x70
+    ) {
+      const brand = buffer.toString('ascii', i + 4, i + 8);
+      if (brand === 'qt  ') {
+        return { mime: 'video/quicktime', ext: 'mov' };
+      }
+      return { mime: 'video/mp4', ext: 'mp4' };
     }
-    return { mime: 'video/mp4', ext: 'mp4' };
   }
 
-  if (asString.startsWith('FLV')) {
+  if (buffer.toString('ascii', 0, 3) === 'FLV') {
     return { mime: 'video/x-flv', ext: 'flv' };
   }
 
@@ -295,12 +326,17 @@ app.post('/api/upload', requireAuth, upload.array('files', MAX_FILES_PER_UPLOAD)
       }
 
       if (!detected || !isAllowedMime(detected.mime)) {
-        await fsp.unlink(filePath).catch(() => {});
-        rejected.push({
-          name: file.originalname,
-          reason: 'Unsupported file type'
-        });
-        continue;
+        const fallback = extInfoFromName(file.originalname);
+        if (fallback && isAllowedMime(fallback.mime)) {
+          detected = fallback;
+        } else {
+          await fsp.unlink(filePath).catch(() => {});
+          rejected.push({
+            name: file.originalname,
+            reason: 'Unsupported file type'
+          });
+          continue;
+        }
       }
 
       const finalName = `${file.__id}.${detected.ext}`;
