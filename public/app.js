@@ -215,7 +215,10 @@ function createCard(item) {
 
   const title = document.createElement('div');
   title.className = 'card-title';
-  title.textContent = item.originalName;
+  const baseName = item.originalName.replace(/\.[^/.]+$/, '');
+  const trimmed = baseName.length > 20 ? `${baseName.slice(0, 20)}...` : baseName;
+  title.textContent = trimmed;
+  title.title = baseName;
 
   const meta = document.createElement('div');
   meta.className = 'card-meta';
