@@ -40,6 +40,51 @@ body {
   display: none;
 }
 
+.lightbox {
+  position: fixed;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  z-index: 6;
+}
+
+.lightbox.hidden {
+  display: none;
+}
+
+.lightbox-backdrop {
+  position: absolute;
+  inset: 0;
+  background: rgba(17, 17, 17, 0.6);
+  backdrop-filter: blur(4px);
+}
+
+.lightbox-content {
+  position: relative;
+  z-index: 1;
+  width: min(92vw, 1200px);
+  max-height: 90vh;
+  background: #ffffff;
+  border-radius: 18px;
+  padding: 16px;
+  display: grid;
+  gap: 12px;
+  box-shadow: var(--shadow);
+}
+
+.lightbox-close {
+  justify-self: end;
+}
+
+.lightbox-img {
+  width: 100%;
+  height: auto;
+  max-height: 75vh;
+  object-fit: contain;
+  border-radius: 12px;
+  background: #f0f0f0;
+}
+
 .auth-card {
   background: var(--card);
   border: 1px solid var(--stroke);
@@ -422,6 +467,7 @@ body {
 .preview.is-video video {
   object-fit: contain;
   background: #0e0e0e;
+  min-height: 180px;
 }
 
 .card-body {

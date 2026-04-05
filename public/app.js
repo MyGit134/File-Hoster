@@ -15,6 +15,9 @@ const authError = document.getElementById('auth-error');
 const queueList = document.getElementById('queue-list');
 const queueCount = document.getElementById('queue-count');
 const queueClear = document.getElementById('queue-clear');
+const lightbox = document.getElementById('lightbox');
+const lightboxImg = document.getElementById('lightbox-img');
+const lightboxClose = document.getElementById('lightbox-close');
 
 let queue = [];
 let accessToken = localStorage.getItem('mediaAccessToken') || '';
@@ -30,6 +33,34 @@ function formatBytes(bytes) {
   }
   return `${value.toFixed(value < 10 && i > 0 ? 1 : 0)} ${units[i]}`;
 }
+
+function isImageByName(name) {
+  const ext = (name || '').toLowerCase().split('.').pop();
+  return ['jpg', 'jpeg', 'png', 'gif', 'webp', 'bmp', 'tif', 'tiff'].includes(ext);
+}
+
+function isVideoByName(name) {
+  const ext = (name || '').toLowerCase().split('.').pop();
+  return ['mp4', 'mov', 'webm', 'avi', 'ogv', 'ogg', 'flv', 'm4v'].includes(ext);
+}
+
+function openLightbox(src, alt) {
+  lightboxImg.src = src;
+  lightboxImg.alt = alt || 'Просмотр';
+  lightbox.classList.remove('hidden');
+}
+
+function closeLightbox() {
+  lightboxImg.src = '';
+  lightbox.classList.add('hidden');
+}
+
+lightboxClose.addEventListener('click', closeLightbox);
+lightbox.addEventListener('click', (event) => {
+  if (event.target.classList.contains('lightbox-backdrop')) {
+    closeLightbox();
+  }
+});
 
 function setStatus(message, tone = 'neutral') {
   uploadStatus.textContent = message;
@@ -261,17 +292,25 @@ function createCard(item) {
   const preview = document.createElement('div');
   preview.className = 'preview';
 
-  if (item.type === 'image') {
+  const nameSaysImage = isImageByName(item.originalName);
+  const nameSaysVideo = isVideoByName(item.originalName);
+  const uiType = nameSaysImage ? 'image' : nameSaysVideo ? 'video' : item.type;
+
+  if (uiType === 'image') {
     const img = document.createElement('img');
     img.src = `${item.viewUrl}?t=${encodeURIComponent(accessToken)}`;
     img.alt = item.originalName;
     img.loading = 'lazy';
+    img.addEventListener('click', () => {
+      openLightbox(img.src, item.originalName);
+    });
     preview.appendChild(img);
   } else {
     preview.classList.add('is-video');
     const video = document.createElement('video');
     video.src = `${item.viewUrl}?t=${encodeURIComponent(accessToken)}`;
     video.controls = true;
+    video.setAttribute('controls', '');
     video.preload = 'metadata';
     preview.appendChild(video);
   }
@@ -295,7 +334,7 @@ function createCard(item) {
 
   const badge = document.createElement('span');
   badge.className = 'badge';
-  badge.textContent = item.type === 'image' ? 'Фото' : 'Видео';
+  badge.textContent = uiType === 'image' ? 'Фото' : 'Видео';
 
   const download = document.createElement('a');
   download.className = 'btn';
