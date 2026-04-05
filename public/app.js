@@ -12,6 +12,9 @@ const auth = document.getElementById('auth');
 const authInput = document.getElementById('auth-input');
 const authBtn = document.getElementById('auth-btn');
 const authError = document.getElementById('auth-error');
+const queueList = document.getElementById('queue-list');
+const queueCount = document.getElementById('queue-count');
+const queueClear = document.getElementById('queue-clear');
 
 let queue = [];
 let accessToken = localStorage.getItem('mediaAccessToken') || '';
@@ -57,17 +60,73 @@ function updateDumpLink() {
   }
 }
 
-function setQueue(files) {
-  queue = Array.from(files || []);
-  if (queue.length) {
-    setStatus(`В очереди: ${queue.length} файл(ов).`);
-  } else {
-    setStatus('Очередь пуста.');
+function addToQueue(files) {
+  const incoming = Array.from(files || []);
+  if (!incoming.length) return;
+  for (let i = incoming.length - 1; i >= 0; i -= 1) {
+    queue.unshift(incoming[i]);
   }
+  renderQueue();
+  setStatus(`В очереди: ${queue.length} файл(ов).`);
+}
+
+function removeFromQueue(index) {
+  if (index < 0 || index >= queue.length) return;
+  queue.splice(index, 1);
+  renderQueue();
+  setStatus(queue.length ? `В очереди: ${queue.length} файл(ов).` : 'Очередь пуста.');
+}
+
+function renderQueue() {
+  queueList.innerHTML = '';
+  const countLabel = queue.length === 1 ? 'файл' : queue.length < 5 ? 'файла' : 'файлов';
+  queueCount.textContent = `${queue.length} ${countLabel}`;
+  queueClear.disabled = queue.length === 0;
+  if (!queue.length) {
+    const empty = document.createElement('div');
+    empty.className = 'queue-meta';
+    empty.textContent = 'Очередь пуста.';
+    queueList.appendChild(empty);
+    return;
+  }
+
+  queue.forEach((file, index) => {
+    const row = document.createElement('div');
+    row.className = 'queue-item';
+
+    const info = document.createElement('div');
+    const name = document.createElement('div');
+    name.className = 'queue-name';
+    name.textContent = file.name;
+    name.title = file.name;
+    const meta = document.createElement('div');
+    meta.className = 'queue-meta';
+    meta.textContent = formatBytes(file.size);
+    info.appendChild(name);
+    info.appendChild(meta);
+
+    const remove = document.createElement('button');
+    remove.className = 'btn ghost queue-remove';
+    remove.type = 'button';
+    remove.textContent = 'Убрать';
+    remove.addEventListener('click', () => removeFromQueue(index));
+
+    row.appendChild(info);
+    row.appendChild(remove);
+    queueList.appendChild(row);
+  });
 }
 
 fileInput.addEventListener('change', (event) => {
-  setQueue(event.target.files);
+  addToQueue(event.target.files);
+  fileInput.value = '';
+});
+
+queueClear.addEventListener('click', () => {
+  if (!queue.length) return;
+  queue = [];
+  renderQueue();
+  setStatus('Очередь пуста.');
 });
 
 authBtn.addEventListener('click', async () => {
@@ -128,7 +187,7 @@ pickBtn.addEventListener('keydown', (event) => {
 
 dropzone.addEventListener('drop', (event) => {
   const files = event.dataTransfer.files;
-  setQueue(files);
+  addToQueue(files);
 });
 
 uploadBtn.addEventListener('click', async () => {
@@ -174,7 +233,8 @@ uploadBtn.addEventListener('click', async () => {
     }
     setStatus(message);
     fileInput.value = '';
-    setQueue([]);
+    queue = [];
+    renderQueue();
     await loadGallery();
   } catch (err) {
     setStatus(`Ошибка: ${err.message}`);
@@ -307,6 +367,7 @@ async function loadGallery() {
 }
 
 updateDumpLink();
+renderQueue();
 if (accessToken) {
   loadGallery();
 } else {

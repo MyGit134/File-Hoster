@@ -283,6 +283,81 @@ body {
   color: var(--muted);
 }
 
+.queue {
+  background: rgba(255, 255, 255, 0.82);
+  border: 1px solid var(--stroke);
+  border-radius: 18px;
+  padding: 18px;
+  box-shadow: var(--shadow);
+  display: grid;
+  gap: 12px;
+}
+
+.queue-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.queue-controls {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.queue-head h3 {
+  font-size: 1.1rem;
+}
+
+.queue-count {
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+
+.queue-list {
+  display: grid;
+  gap: 10px;
+}
+
+.queue-item {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 12px;
+  align-items: center;
+  padding: 10px 12px;
+  border-radius: 12px;
+  border: 1px solid var(--stroke);
+  background: white;
+}
+
+.queue-name {
+  font-weight: 600;
+  font-size: 0.95rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.queue-meta {
+  color: var(--muted);
+  font-size: 0.8rem;
+}
+
+.queue-remove {
+  padding: 6px 12px;
+  font-size: 0.8rem;
+  box-shadow: none;
+}
+
+.queue-clear {
+  padding: 6px 12px;
+  font-size: 0.8rem;
+  box-shadow: none;
+}
+
 .actions {
   display: flex;
   justify-content: space-between;

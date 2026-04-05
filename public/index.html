@@ -61,6 +61,16 @@
           <p class="hint">Максимум 20 файлов за раз, до 200 МБ каждый.</p>
         </div>
         <div class="upload-status" id="upload-status"></div>
+        <div class="queue" id="queue">
+          <div class="queue-head">
+            <h3>Очередь загрузки</h3>
+            <div class="queue-controls">
+              <span class="queue-count" id="queue-count">0 файлов</span>
+              <button class="btn ghost queue-clear" id="queue-clear" type="button">Очистить очередь</button>
+            </div>
+          </div>
+          <div class="queue-list" id="queue-list"></div>
+        </div>
       </section>
 
       <section class="actions">
