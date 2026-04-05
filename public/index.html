@@ -41,8 +41,8 @@
             <p>или выберите фото/видео вручную</p>
           </div>
           <div class="drop-actions">
-            <input id="file-input" type="file" accept="image/*,video/*" multiple hidden />
-            <label class="btn primary" id="pick-btn" for="file-input" role="button">Выбрать файлы</label>
+            <input id="file-input" type="file" accept="image/*,video/*" multiple style="position:absolute; left:-9999px; width:1px; height:1px; opacity:0;" />
+            <label class="btn primary" id="pick-btn" for="file-input" role="button" tabindex="0">Выбрать файлы</label>
             <button class="btn" id="upload-btn" type="button">Загрузить</button>
           </div>
           <p class="hint">Максимум 20 файлов за раз, до 200 МБ каждый.</p>

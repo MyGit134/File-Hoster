@@ -17,7 +17,23 @@ const MAX_FILES_PER_UPLOAD = 20;
 
 app.disable('x-powered-by');
 app.use(helmet({
-  crossOriginResourcePolicy: { policy: 'same-site' }
+  crossOriginResourcePolicy: { policy: 'same-site' },
+  contentSecurityPolicy: {
+    useDefaults: false,
+    directives: {
+      'default-src': ["'self'"],
+      'base-uri': ["'self'"],
+      'form-action': ["'self'"],
+      'frame-ancestors': ["'self'"],
+      'object-src': ["'none'"],
+      'script-src': ["'self'"],
+      'style-src': ["'self'", "'unsafe-inline'", 'https:'],
+      'font-src': ["'self'", 'https:', 'data:'],
+      'img-src': ["'self'", 'data:', 'blob:'],
+      'media-src': ["'self'", 'blob:'],
+      'connect-src': ["'self'"]
+    }
+  }
 }));
 app.use(rateLimit({
   windowMs: 15 * 60 * 1000,

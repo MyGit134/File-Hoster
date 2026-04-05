@@ -40,6 +40,13 @@ fileInput.addEventListener('change', (event) => {
   setQueue(event.target.files);
 });
 
+pickBtn.addEventListener('keydown', (event) => {
+  if (event.key === 'Enter' || event.key === ' ') {
+    event.preventDefault();
+    fileInput.click();
+  }
+});
+
 ['dragenter', 'dragover'].forEach((eventName) => {
   dropzone.addEventListener(eventName, (event) => {
     event.preventDefault();
