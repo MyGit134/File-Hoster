@@ -3,8 +3,8 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>File Hoster — Фото и видео</title>
-    <link rel="stylesheet" href="/styles.css?v=5" />
+    <title>File Hoster — Доступ</title>
+    <link rel="stylesheet" href="/styles.css?v=7" />
   </head>
   <body>
     <div class="ambient">
@@ -13,88 +13,19 @@
       <div class="orb orb-c"></div>
     </div>
 
-    <div class="auth" id="auth">
-      <div class="auth-card">
+    <main class="page login">
+      <div class="auth-card login-card">
         <p class="eyebrow">Доступ</p>
-        <h2>Введите пароль</h2>
-        <p class="lede">Это одноразовый пароль для доступа к библиотеке.</p>
+        <h1>Введите пароль</h1>
+        <p class="lede">Доступ к медиа-библиотеке открыт только после ввода пароля.</p>
         <div class="auth-row">
-          <input class="auth-input" id="auth-input" type="password" placeholder="Пароль" autocomplete="current-password" />
-          <button class="btn primary" id="auth-btn" type="button">Войти</button>
+          <input class="auth-input" id="login-input" type="password" placeholder="Пароль" autocomplete="current-password" />
+          <button class="btn primary" id="login-btn" type="button">Войти</button>
         </div>
-        <p class="auth-error" id="auth-error"></p>
+        <p class="auth-error" id="login-error"></p>
       </div>
-    </div>
-
-    <div class="lightbox hidden" id="lightbox">
-      <div class="lightbox-backdrop"></div>
-      <div class="lightbox-content">
-        <button class="lightbox-close" id="lightbox-close" type="button">Закрыть</button>
-        <img class="lightbox-img" id="lightbox-img" alt="Просмотр" />
-      </div>
-    </div>
-
-    <main class="page">
-      <header class="hero">
-        <div>
-          <p class="eyebrow">Локальный медиа-хостинг</p>
-          <h1>Загружайте фото и видео, смотрите и скачивайте в одном месте.</h1>
-          <p class="lede">
-            Никакой регистрации — только быстрые превью, аккуратная галерея и единый дамп в архив.
-          </p>
-        </div>
-        <div class="stats" id="stats">
-          <div class="stat">
-            <span class="stat-label">Файлов в коллекции</span>
-            <span class="stat-value" id="stat-count">0</span>
-          </div>
-          <div class="stat">
-            <span class="stat-label">Общий размер</span>
-            <span class="stat-value" id="stat-size">0 МБ</span>
-          </div>
-        </div>
-      </header>
-
-      <section class="upload">
-        <div class="dropzone" id="dropzone">
-          <div>
-            <h2>Перетащите сюда файлы</h2>
-            <p>или выберите фото/видео вручную</p>
-          </div>
-          <div class="drop-actions">
-            <input id="file-input" type="file" accept="image/*,video/*" multiple style="position:absolute; left:-9999px; width:1px; height:1px; opacity:0;" />
-            <button class="btn primary" id="pick-btn" type="button">Выбрать файлы</button>
-            <button class="btn" id="upload-btn" type="button">Загрузить</button>
-          </div>
-          <p class="hint">Максимум 20 файлов за раз, до 200 МБ каждый.</p>
-        </div>
-        <div class="upload-status" id="upload-status"></div>
-        <div class="queue" id="queue">
-          <div class="queue-head">
-            <h3>Очередь загрузки</h3>
-            <div class="queue-controls">
-              <span class="queue-count" id="queue-count">0 файлов</span>
-              <button class="btn ghost queue-clear" id="queue-clear" type="button">Очистить очередь</button>
-            </div>
-          </div>
-          <div class="queue-list" id="queue-list"></div>
-        </div>
-      </section>
-
-      <section class="actions">
-        <div>
-          <h2>Галерея</h2>
-          <p>Все загруженные файлы доступны для просмотра и скачивания.</p>
-        </div>
-        <div>
-          <button class="btn ghost" id="refresh-btn">Обновить список</button>
-          <a class="btn primary" id="dump-btn" href="/api/dump">Скачать все в ZIP</a>
-        </div>
-      </section>
-
-      <section class="gallery" id="gallery"></section>
     </main>
 
-    <script src="/app.js?v=5"></script>
+    <script src="/login.js?v=7"></script>
   </body>
 </html>

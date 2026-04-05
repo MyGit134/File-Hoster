@@ -96,6 +96,17 @@ body {
   gap: 16px;
 }
 
+.login {
+  min-height: 100vh;
+  display: grid;
+  place-items: center;
+  padding: 48px 24px;
+}
+
+.login-card {
+  width: min(560px, 92vw);
+}
+
 .auth-row {
   display: flex;
   gap: 12px;
@@ -316,6 +327,11 @@ body {
 
 .btn.ghost {
   background: transparent;
+}
+
+.btn.logout {
+  color: #5a1f1f;
+  border-color: #e1c6c6;
 }
 
 .hint {

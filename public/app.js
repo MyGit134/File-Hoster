@@ -8,6 +8,7 @@ const gallery = document.getElementById('gallery');
 const statCount = document.getElementById('stat-count');
 const statSize = document.getElementById('stat-size');
 const dumpBtn = document.getElementById('dump-btn');
+const logoutBtn = document.getElementById('logout-btn');
 const auth = document.getElementById('auth');
 const authInput = document.getElementById('auth-input');
 const authBtn = document.getElementById('auth-btn');
@@ -20,7 +21,7 @@ const lightboxImg = document.getElementById('lightbox-img');
 const lightboxClose = document.getElementById('lightbox-close');
 
 let queue = [];
-let accessToken = localStorage.getItem('mediaAccessToken') || '';
+let accessToken = sessionStorage.getItem('mediaAccessToken') || '';
 
 function formatBytes(bytes) {
   if (!bytes) return '0 МБ';
@@ -74,10 +75,8 @@ function setAuthError(message) {
 function setAccessToken(token) {
   accessToken = token || '';
   if (accessToken) {
-    localStorage.setItem('mediaAccessToken', accessToken);
     auth.classList.add('hidden');
   } else {
-    localStorage.removeItem('mediaAccessToken');
     auth.classList.remove('hidden');
   }
   updateDumpLink();
@@ -89,6 +88,12 @@ function updateDumpLink() {
   } else {
     dumpBtn.href = '#';
   }
+}
+
+function logout() {
+  sessionStorage.removeItem('mediaAccessToken');
+  localStorage.removeItem('mediaAccessTokenHint');
+  window.location.href = '/';
 }
 
 function addToQueue(files) {
@@ -285,6 +290,8 @@ refreshBtn.addEventListener('click', () => {
   loadGallery();
 });
 
+logoutBtn.addEventListener('click', logout);
+
 function createCard(item) {
   const card = document.createElement('article');
   card.className = 'card';
@@ -411,11 +418,11 @@ async function loadGallery() {
   }
 }
 
-updateDumpLink();
 renderQueue();
-if (accessToken) {
-  loadGallery();
+if (!accessToken) {
+  window.location.href = '/';
 } else {
-  auth.classList.remove('hidden');
+  setAccessToken(accessToken);
+  loadGallery();
 }
 setStatus('Очередь пуста.');
