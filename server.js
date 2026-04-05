@@ -40,6 +40,8 @@ app.use(rateLimit({
   windowMs: 15 * 60 * 1000,
   limit: 200
 }));
+app.use(express.json({ limit: '100kb' }));
+app.use(express.urlencoded({ extended: false }));
 
 app.use(express.static(path.join(__dirname, 'public'), {
   maxAge: '1h',
@@ -58,16 +60,54 @@ if (!fs.existsSync(UPLOAD_DIR)) {
   fs.mkdirSync(UPLOAD_DIR, { recursive: true });
 }
 
-let meta = { files: [] };
+let meta = { files: [], groups: [] };
 if (fs.existsSync(META_PATH)) {
   try {
     const raw = fs.readFileSync(META_PATH, 'utf8');
     meta = JSON.parse(raw);
     if (!meta || !Array.isArray(meta.files)) {
-      meta = { files: [] };
+      meta = { files: [], groups: [] };
     }
   } catch {
-    meta = { files: [] };
+    meta = { files: [], groups: [] };
+  }
+}
+
+function ensureGroups() {
+  if (!Array.isArray(meta.groups)) {
+    meta.groups = [];
+  }
+
+  const findByName = (name) => meta.groups.find((g) => g.name === name);
+  let mixed = findByName('Смешнявка');
+  let other = findByName('Остальное');
+
+  if (!mixed) {
+    mixed = { id: crypto.randomUUID ? crypto.randomUUID() : crypto.randomBytes(16).toString('hex'), name: 'Смешнявка' };
+    meta.groups.push(mixed);
+  }
+  if (!other) {
+    other = { id: crypto.randomUUID ? crypto.randomUUID() : crypto.randomBytes(16).toString('hex'), name: 'Остальное' };
+    meta.groups.push(other);
+  }
+
+  let changed = false;
+  meta.files.forEach((file) => {
+    if (!file.groupId) {
+      file.groupId = mixed.id;
+      changed = true;
+    }
+  });
+
+  return { mixedId: mixed.id, otherId: other.id, changed };
+}
+
+const groupState = ensureGroups();
+if (groupState.changed) {
+  try {
+    fs.writeFileSync(META_PATH, JSON.stringify(meta, null, 2));
+  } catch (err) {
+    console.error('Failed to persist migrated groups:', err);
   }
 }
 
@@ -81,8 +121,28 @@ function safeName(input) {
   return cleaned.length ? cleaned : 'file';
 }
 
+function safeGroupName(input) {
+  const raw = String(input || '').trim();
+  const sanitized = raw.replace(/[\\/]/g, '_').replace(/[\u0000-\u001f]/g, '').trim();
+  return sanitized.length ? sanitized : 'Без_названия';
+}
+
 function isAllowedMime(mime) {
   return mime && (mime.startsWith('image/') || mime.startsWith('video/'));
+}
+
+function getGroupById(id) {
+  return meta.groups.find((g) => g.id === id);
+}
+
+function getGroupByName(name) {
+  const needle = String(name || '').toLowerCase();
+  return meta.groups.find((g) => String(g.name || '').toLowerCase() === needle);
+}
+
+function requireOtherGroupId() {
+  const other = getGroupByName('Остальное');
+  return other ? other.id : groupState.otherId;
 }
 
 function mimeFromExt(filename) {
@@ -291,6 +351,7 @@ app.get('/api/list', requireAuth, async (req, res, next) => {
 
     const resolved = await Promise.all(files.map(async (item) => {
       const resolvedMime = await resolveMimeForItem(item);
+      const group = getGroupById(item.groupId) || getGroupByName('Остальное');
       return {
         id: item.id,
         originalName: item.originalName,
@@ -300,7 +361,9 @@ app.get('/api/list', requireAuth, async (req, res, next) => {
         uploadedAt: item.uploadedAt,
         viewUrl: `/api/file/${item.id}`,
         downloadUrl: `/api/download/${item.id}`,
-        type: resolvedMime.type
+        type: resolvedMime.type,
+        groupId: group ? group.id : null,
+        groupName: group ? group.name : 'Остальное'
       };
     }));
 
@@ -310,11 +373,80 @@ app.get('/api/list', requireAuth, async (req, res, next) => {
   }
 });
 
+app.get('/api/groups', requireAuth, (req, res) => {
+  res.json(meta.groups.map((group) => ({
+    id: group.id,
+    name: group.name
+  })));
+});
+
+app.post('/api/groups', requireAuth, async (req, res) => {
+  const name = safeGroupName(req.body?.name || '');
+  if (!name) {
+    res.status(400).json({ error: 'Invalid name' });
+    return;
+  }
+  if (getGroupByName(name)) {
+    res.status(409).json({ error: 'Group name exists' });
+    return;
+  }
+  const id = typeof crypto.randomUUID === 'function'
+    ? crypto.randomUUID()
+    : crypto.randomBytes(16).toString('hex');
+  meta.groups.push({ id, name });
+  await persistMeta();
+  res.json({ id, name });
+});
+
+app.patch('/api/groups/:id', requireAuth, async (req, res) => {
+  const group = getGroupById(req.params.id);
+  if (!group) {
+    res.status(404).json({ error: 'Not found' });
+    return;
+  }
+  const name = safeGroupName(req.body?.name || '');
+  if (!name) {
+    res.status(400).json({ error: 'Invalid name' });
+    return;
+  }
+  const existing = getGroupByName(name);
+  if (existing && existing.id !== group.id) {
+    res.status(409).json({ error: 'Group name exists' });
+    return;
+  }
+  group.name = name;
+  await persistMeta();
+  res.json({ id: group.id, name: group.name });
+});
+
+app.delete('/api/groups/:id', requireAuth, async (req, res) => {
+  const group = getGroupById(req.params.id);
+  if (!group) {
+    res.status(404).json({ error: 'Not found' });
+    return;
+  }
+  if (group.name === 'Остальное') {
+    res.status(400).json({ error: 'Cannot delete default group' });
+    return;
+  }
+  const otherId = requireOtherGroupId();
+  meta.files.forEach((file) => {
+    if (file.groupId === group.id) {
+      file.groupId = otherId;
+    }
+  });
+  meta.groups = meta.groups.filter((g) => g.id !== group.id);
+  await persistMeta();
+  res.json({ ok: true });
+});
+
 app.post('/api/upload', requireAuth, upload.array('files', MAX_FILES_PER_UPLOAD), async (req, res, next) => {
   try {
     const files = req.files || [];
     const accepted = [];
     const rejected = [];
+    const requestedGroupId = req.body?.groupId || '';
+    const targetGroup = getGroupById(requestedGroupId) || getGroupByName('Остальное');
 
     for (const file of files) {
       const filePath = file.path;
@@ -349,7 +481,8 @@ app.post('/api/upload', requireAuth, upload.array('files', MAX_FILES_PER_UPLOAD)
         storedName: finalName,
         size: file.size,
         mime: detected.mime,
-        uploadedAt: new Date().toISOString()
+        uploadedAt: new Date().toISOString(),
+        groupId: targetGroup ? targetGroup.id : requireOtherGroupId()
       };
 
       meta.files.push(item);
@@ -361,7 +494,9 @@ app.post('/api/upload', requireAuth, upload.array('files', MAX_FILES_PER_UPLOAD)
         uploadedAt: item.uploadedAt,
         viewUrl: `/api/file/${item.id}`,
         downloadUrl: `/api/download/${item.id}`,
-        type: item.mime.startsWith('image/') ? 'image' : 'video'
+        type: item.mime.startsWith('image/') ? 'image' : 'video',
+        groupId: item.groupId,
+        groupName: (targetGroup && targetGroup.name) || 'Остальное'
       });
     }
 
@@ -434,7 +569,9 @@ app.get('/api/dump', requireAuth, (req, res) => {
 
   for (const item of files) {
     const full = path.join(UPLOAD_DIR, item.storedName);
-    const name = `${item.id}_${safeName(item.originalName)}`;
+    const group = getGroupById(item.groupId) || getGroupByName('Остальное');
+    const folder = safeGroupName(group ? group.name : 'Остальное');
+    const name = `${folder}/${item.id}_${safeName(item.originalName)}`;
     archive.file(full, { name });
   }
 

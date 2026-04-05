@@ -19,9 +19,16 @@ const queueClear = document.getElementById('queue-clear');
 const lightbox = document.getElementById('lightbox');
 const lightboxImg = document.getElementById('lightbox-img');
 const lightboxClose = document.getElementById('lightbox-close');
+const groupSelect = document.getElementById('group-select');
+const groupFilter = document.getElementById('group-filter');
+const groupsList = document.getElementById('groups-list');
+const groupInput = document.getElementById('group-input');
+const groupCreate = document.getElementById('group-create');
 
 let queue = [];
 let accessToken = sessionStorage.getItem('mediaAccessToken') || '';
+let groups = [];
+let itemsCache = [];
 
 function formatBytes(bytes) {
   if (!bytes) return '0 МБ';
@@ -88,6 +95,120 @@ function updateDumpLink() {
   } else {
     dumpBtn.href = '#';
   }
+}
+
+function getOtherGroup() {
+  return groups.find((g) => g.name === 'Остальное');
+}
+
+function getGroupNameById(id) {
+  const found = groups.find((g) => g.id === id);
+  return found ? found.name : 'Остальное';
+}
+
+function renderGroupSelect() {
+  if (!groupSelect) return;
+  groupSelect.innerHTML = '';
+  groups.forEach((group) => {
+    const option = document.createElement('option');
+    option.value = group.id;
+    option.textContent = `Группа: ${group.name}`;
+    groupSelect.appendChild(option);
+  });
+  const other = getOtherGroup();
+  if (other) {
+    groupSelect.value = other.id;
+  }
+}
+
+function renderGroupFilter() {
+  if (!groupFilter) return;
+  const current = groupFilter.value || 'all';
+  groupFilter.innerHTML = '';
+  const all = document.createElement('option');
+  all.value = 'all';
+  all.textContent = 'Все группы';
+  groupFilter.appendChild(all);
+  groups.forEach((group) => {
+    const option = document.createElement('option');
+    option.value = group.id;
+    option.textContent = group.name;
+    groupFilter.appendChild(option);
+  });
+  groupFilter.value = groups.find((g) => g.id === current) ? current : 'all';
+}
+
+function renderGroupsList() {
+  if (!groupsList) return;
+  groupsList.innerHTML = '';
+  groups.forEach((group) => {
+    const row = document.createElement('div');
+    row.className = 'group-row';
+
+    const name = document.createElement('div');
+    name.className = 'group-name';
+    name.textContent = group.name;
+
+    const actions = document.createElement('div');
+    actions.className = 'group-actions';
+
+    const rename = document.createElement('button');
+    rename.className = 'btn ghost';
+    rename.type = 'button';
+    rename.textContent = 'Переименовать';
+    rename.addEventListener('click', async () => {
+      const nextName = prompt('Новое название группы:', group.name);
+      if (!nextName || nextName.trim() === group.name) return;
+      try {
+        const response = await fetch(`/api/groups/${group.id}`, {
+          method: 'PATCH',
+          headers: {
+            'Content-Type': 'application/json',
+            'x-access-token': accessToken
+          },
+          body: JSON.stringify({ name: nextName.trim() })
+        });
+        if (!response.ok) {
+          const result = await response.json().catch(() => ({}));
+          throw new Error(result.error || 'Ошибка переименования');
+        }
+        await loadGroups();
+        await loadGallery();
+      } catch (err) {
+        setStatus(err.message || 'Ошибка переименования');
+      }
+    });
+
+    const remove = document.createElement('button');
+    remove.className = 'btn danger';
+    remove.type = 'button';
+    remove.textContent = 'Удалить';
+    remove.disabled = group.name === 'Остальное';
+    remove.addEventListener('click', async () => {
+      if (group.name === 'Остальное') return;
+      if (!confirm(`Удалить группу "${group.name}"? Файлы перейдут в "Остальное".`)) return;
+      try {
+        const response = await fetch(`/api/groups/${group.id}`, {
+          method: 'DELETE',
+          headers: { 'x-access-token': accessToken }
+        });
+        if (!response.ok) {
+          const result = await response.json().catch(() => ({}));
+          throw new Error(result.error || 'Ошибка удаления');
+        }
+        await loadGroups();
+        await loadGallery();
+      } catch (err) {
+        setStatus(err.message || 'Ошибка удаления');
+      }
+    });
+
+    actions.appendChild(rename);
+    actions.appendChild(remove);
+    row.appendChild(name);
+    row.appendChild(actions);
+    groupsList.appendChild(row);
+  });
 }
 
 function logout() {
@@ -187,6 +308,7 @@ authBtn.addEventListener('click', async () => {
       throw new Error('Неверный пароль.');
     }
     setAccessToken(token);
+    await loadGroups();
     await loadGallery();
   } catch (err) {
     setAccessToken('');
@@ -244,6 +366,9 @@ uploadBtn.addEventListener('click', async () => {
 
   const formData = new FormData();
   queue.forEach((file) => formData.append('files', file));
+  if (groupSelect && groupSelect.value) {
+    formData.append('groupId', groupSelect.value);
+  }
 
   setStatus('Загрузка файлов...');
   uploadBtn.disabled = true;
@@ -292,6 +417,40 @@ refreshBtn.addEventListener('click', () => {
 
 logoutBtn.addEventListener('click', logout);
 
+if (groupFilter) {
+  groupFilter.addEventListener('change', () => {
+    renderGallery(itemsCache);
+  });
+}
+
+if (groupCreate) {
+  groupCreate.addEventListener('click', async () => {
+    const name = (groupInput.value || '').trim();
+    if (!name) {
+      setStatus('Введите название группы.');
+      return;
+    }
+    try {
+      const response = await fetch('/api/groups', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-access-token': accessToken
+        },
+        body: JSON.stringify({ name })
+      });
+      if (!response.ok) {
+        const result = await response.json().catch(() => ({}));
+        throw new Error(result.error || 'Ошибка создания');
+      }
+      groupInput.value = '';
+      await loadGroups();
+    } catch (err) {
+      setStatus(err.message || 'Ошибка создания');
+    }
+  });
+}
+
 function createCard(item) {
   const card = document.createElement('article');
   card.className = 'card';
@@ -334,7 +493,8 @@ function createCard(item) {
 
   const meta = document.createElement('div');
   meta.className = 'card-meta';
-  meta.textContent = `${formatBytes(item.size)} • ${new Date(item.uploadedAt).toLocaleString('ru-RU')}`;
+  const groupLabel = item.groupName ? ` • ${item.groupName}` : '';
+  meta.textContent = `${formatBytes(item.size)} • ${new Date(item.uploadedAt).toLocaleString('ru-RU')}${groupLabel}`;
 
   const actions = document.createElement('div');
   actions.className = 'card-actions';
@@ -398,17 +558,11 @@ async function loadGallery() {
       return;
     }
     const items = await response.json();
-    if (!Array.isArray(items) || items.length === 0) {
-      const empty = document.createElement('div');
-      empty.className = 'empty';
-      empty.textContent = 'Пока нет загруженных файлов.';
-      gallery.appendChild(empty);
-    } else {
-      items.forEach((item) => gallery.appendChild(createCard(item)));
-    }
+    itemsCache = Array.isArray(items) ? items : [];
+    renderGallery(itemsCache);
 
-    const totalSize = Array.isArray(items) ? items.reduce((sum, item) => sum + (item.size || 0), 0) : 0;
-    statCount.textContent = Array.isArray(items) ? items.length : 0;
+    const totalSize = itemsCache.reduce((sum, item) => sum + (item.size || 0), 0);
+    statCount.textContent = itemsCache.length;
     statSize.textContent = formatBytes(totalSize);
   } catch (err) {
     const empty = document.createElement('div');
@@ -418,11 +572,72 @@ async function loadGallery() {
   }
 }
 
+function renderGallery(items) {
+  gallery.innerHTML = '';
+  if (!items.length) {
+    const empty = document.createElement('div');
+    empty.className = 'empty';
+    empty.textContent = 'Пока нет загруженных файлов.';
+    gallery.appendChild(empty);
+    return;
+  }
+
+  const filterId = groupFilter ? groupFilter.value : 'all';
+  const grouped = new Map();
+  items.forEach((item) => {
+    const groupId = item.groupId || (getOtherGroup() ? getOtherGroup().id : 'other');
+    if (!grouped.has(groupId)) {
+      grouped.set(groupId, []);
+    }
+    grouped.get(groupId).push(item);
+  });
+
+  const orderedGroups = groups.length ? groups : [{ id: 'other', name: 'Остальное' }];
+  orderedGroups.forEach((group) => {
+    if (filterId !== 'all' && filterId !== group.id) return;
+    const itemsInGroup = grouped.get(group.id) || [];
+    if (!itemsInGroup.length) return;
+
+    const header = document.createElement('div');
+    header.className = 'group-title';
+    header.textContent = group.name;
+    gallery.appendChild(header);
+
+    const block = document.createElement('div');
+    block.className = 'group-grid';
+    itemsInGroup.forEach((item) => block.appendChild(createCard(item)));
+    gallery.appendChild(block);
+  });
+}
+
+async function loadGroups() {
+  if (!accessToken) return;
+  try {
+    const response = await fetch('/api/groups', {
+      headers: { 'x-access-token': accessToken }
+    });
+    if (!response.ok) {
+      throw new Error('Ошибка загрузки групп');
+    }
+    const data = await response.json();
+    groups = Array.isArray(data) ? data : [];
+    renderGroupSelect();
+    renderGroupFilter();
+    renderGroupsList();
+    if (itemsCache.length) {
+      renderGallery(itemsCache);
+    }
+  } catch (err) {
+    setStatus(err.message || 'Ошибка загрузки групп');
+  }
+}
+
 renderQueue();
 if (!accessToken) {
   window.location.href = '/';
 } else {
   setAccessToken(accessToken);
+  loadGroups();
   loadGallery();
 }
 setStatus('Очередь пуста.');
