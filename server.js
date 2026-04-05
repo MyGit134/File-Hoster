@@ -15,15 +15,6 @@ const META_PATH = path.join(UPLOAD_DIR, 'meta.json');
 const MAX_FILE_SIZE = 200 * 1024 * 1024; // 200MB
 const MAX_FILES_PER_UPLOAD = 20;
 
-let fileTypeFromFile;
-const fileTypeReady = import('file-type')
-  .then((mod) => {
-    fileTypeFromFile = mod.fileTypeFromFile;
-  })
-  .catch((err) => {
-    console.error('Failed to load file-type module:', err);
-  });
-
 app.disable('x-powered-by');
 app.use(helmet({
   crossOriginResourcePolicy: { policy: 'same-site' },
@@ -87,6 +78,77 @@ function isAllowedMime(mime) {
   return mime && (mime.startsWith('image/') || mime.startsWith('video/'));
 }
 
+function detectFromBuffer(buffer) {
+  if (!buffer || buffer.length < 12) return null;
+
+  const asString = buffer.toString('ascii', 0, 12);
+
+  if (buffer[0] === 0xff && buffer[1] === 0xd8 && buffer[2] === 0xff) {
+    return { mime: 'image/jpeg', ext: 'jpg' };
+  }
+
+  if (asString.startsWith('\x89PNG\r\n\x1a\n')) {
+    return { mime: 'image/png', ext: 'png' };
+  }
+
+  if (asString.startsWith('GIF87a') || asString.startsWith('GIF89a')) {
+    return { mime: 'image/gif', ext: 'gif' };
+  }
+
+  if (asString.startsWith('BM')) {
+    return { mime: 'image/bmp', ext: 'bmp' };
+  }
+
+  if (asString.startsWith('II*\0') || asString.startsWith('MM\0*')) {
+    return { mime: 'image/tiff', ext: 'tiff' };
+  }
+
+  if (asString.startsWith('RIFF') && asString.slice(8, 12) === 'WEBP') {
+    return { mime: 'image/webp', ext: 'webp' };
+  }
+
+  if (asString.startsWith('RIFF') && asString.slice(8, 12) === 'AVI ') {
+    return { mime: 'video/x-msvideo', ext: 'avi' };
+  }
+
+  if (asString.startsWith('OggS')) {
+    return { mime: 'video/ogg', ext: 'ogv' };
+  }
+
+  if (
+    buffer[0] === 0x1a &&
+    buffer[1] === 0x45 &&
+    buffer[2] === 0xdf &&
+    buffer[3] === 0xa3
+  ) {
+    return { mime: 'video/webm', ext: 'webm' };
+  }
+
+  if (asString.slice(4, 8) === 'ftyp') {
+    const brand = asString.slice(8, 12);
+    if (brand === 'qt  ') {
+      return { mime: 'video/quicktime', ext: 'mov' };
+    }
+    return { mime: 'video/mp4', ext: 'mp4' };
+  }
+
+  if (asString.startsWith('FLV')) {
+    return { mime: 'video/x-flv', ext: 'flv' };
+  }
+
+  return null;
+}
+
+async function detectFromFile(filePath) {
+  const handle = await fsp.open(filePath, 'r');
+  try {
+    const { buffer, bytesRead } = await handle.read(Buffer.alloc(4100), 0, 4100, 0);
+    return detectFromBuffer(buffer.slice(0, bytesRead));
+  } finally {
+    await handle.close();
+  }
+}
+
 const storage = multer.diskStorage({
   destination(req, file, cb) {
     cb(null, UPLOAD_DIR);
@@ -125,22 +187,17 @@ app.get('/api/list', (req, res) => {
 
 app.post('/api/upload', upload.array('files', MAX_FILES_PER_UPLOAD), async (req, res, next) => {
   try {
-    await fileTypeReady;
-    if (typeof fileTypeFromFile !== 'function') {
-      res.status(500).json({ error: 'Upload processor unavailable' });
-      return;
-    }
     const files = req.files || [];
     const accepted = [];
     const rejected = [];
 
     for (const file of files) {
       const filePath = file.path;
-      let detected;
+      let detected = null;
       try {
-        detected = await fileTypeFromFile(filePath);
-      } catch {
-        detected = null;
+        detected = await detectFromFile(filePath);
+      } catch (err) {
+        console.error('Detect error:', err);
       }
 
       if (!detected || !isAllowedMime(detected.mime)) {
