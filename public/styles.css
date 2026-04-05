@@ -356,6 +356,13 @@ body {
   padding: 6px 12px;
   font-size: 0.8rem;
   box-shadow: none;
+  background: #d8efff;
+  border-color: #b7defa;
+  color: #1a4d7a;
+}
+
+.queue-clear:hover {
+  background: #c7e7ff;
 }
 
 .actions {
@@ -407,6 +414,16 @@ body {
   object-fit: cover;
 }
 
+.preview.is-video {
+  aspect-ratio: 16 / 9;
+  background: #0e0e0e;
+}
+
+.preview.is-video video {
+  object-fit: contain;
+  background: #0e0e0e;
+}
+
 .card-body {
   padding: 0 16px 16px;
   display: grid;
@@ -416,6 +433,9 @@ body {
 .card-title {
   font-weight: 600;
   font-size: 0.95rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .card-meta {

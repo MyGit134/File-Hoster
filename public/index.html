@@ -4,7 +4,7 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>File Hoster — Фото и видео</title>
-    <link rel="stylesheet" href="/styles.css?v=3" />
+    <link rel="stylesheet" href="/styles.css?v=5" />
   </head>
   <body>
     <div class="ambient">
@@ -55,7 +55,7 @@
           </div>
           <div class="drop-actions">
             <input id="file-input" type="file" accept="image/*,video/*" multiple style="position:absolute; left:-9999px; width:1px; height:1px; opacity:0;" />
-            <label class="btn primary" id="pick-btn" for="file-input" role="button" tabindex="0">Выбрать файлы</label>
+            <button class="btn primary" id="pick-btn" type="button">Выбрать файлы</button>
             <button class="btn" id="upload-btn" type="button">Загрузить</button>
           </div>
           <p class="hint">Максимум 20 файлов за раз, до 200 МБ каждый.</p>
@@ -87,6 +87,6 @@
       <section class="gallery" id="gallery"></section>
     </main>
 
-    <script src="/app.js?v=3"></script>
+    <script src="/app.js?v=5"></script>
   </body>
 </html>

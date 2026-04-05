@@ -78,6 +78,7 @@ function removeFromQueue(index) {
 }
 
 function renderQueue() {
+  if (!queueList || !queueCount || !queueClear) return;
   queueList.innerHTML = '';
   const countLabel = queue.length === 1 ? 'файл' : queue.length < 5 ? 'файла' : 'файлов';
   queueCount.textContent = `${queue.length} ${countLabel}`;
@@ -120,6 +121,10 @@ function renderQueue() {
 fileInput.addEventListener('change', (event) => {
   addToQueue(event.target.files);
   fileInput.value = '';
+});
+
+pickBtn.addEventListener('click', () => {
+  fileInput.click();
 });
 
 queueClear.addEventListener('click', () => {
@@ -263,6 +268,7 @@ function createCard(item) {
     img.loading = 'lazy';
     preview.appendChild(img);
   } else {
+    preview.classList.add('is-video');
     const video = document.createElement('video');
     video.src = `${item.viewUrl}?t=${encodeURIComponent(accessToken)}`;
     video.controls = true;
