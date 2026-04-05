@@ -349,17 +349,25 @@ body {
 }
 
 .card-actions {
-  display: flex;
-  justify-content: flex-start;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   align-items: center;
   gap: 8px;
-  flex-wrap: wrap;
 }
 
 .card-actions .btn {
   padding: 8px 14px;
   font-size: 0.85rem;
   box-shadow: none;
+  width: 100%;
+  justify-content: center;
+  white-space: nowrap;
+}
+
+.card-actions .badge {
+  width: 100%;
+  justify-content: center;
+  white-space: nowrap;
 }
 
 .badge {
