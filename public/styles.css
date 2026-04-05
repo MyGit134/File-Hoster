@@ -26,6 +26,53 @@ body {
   min-height: 100vh;
 }
 
+.auth {
+  position: fixed;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  background: rgba(247, 242, 238, 0.75);
+  backdrop-filter: blur(6px);
+  z-index: 5;
+}
+
+.auth.hidden {
+  display: none;
+}
+
+.auth-card {
+  background: var(--card);
+  border: 1px solid var(--stroke);
+  border-radius: 24px;
+  padding: 28px;
+  width: min(520px, 90vw);
+  box-shadow: var(--shadow);
+  display: grid;
+  gap: 16px;
+}
+
+.auth-row {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+.auth-input {
+  flex: 1;
+  min-width: 200px;
+  padding: 12px 16px;
+  border-radius: 12px;
+  border: 1px solid var(--stroke);
+  font-family: inherit;
+}
+
+.auth-error {
+  color: #a43737;
+  min-height: 20px;
+  font-size: 0.9rem;
+}
+
 .ambient {
   position: fixed;
   inset: 0;
@@ -212,6 +259,12 @@ body {
 
 .btn.primary {
   background: var(--accent);
+  color: white;
+  border-color: transparent;
+}
+
+.btn.danger {
+  background: #b03a3a;
   color: white;
   border-color: transparent;
 }

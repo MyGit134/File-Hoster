@@ -14,6 +14,7 @@ const UPLOAD_DIR = path.join(__dirname, 'uploads');
 const META_PATH = path.join(UPLOAD_DIR, 'meta.json');
 const MAX_FILE_SIZE = 200 * 1024 * 1024; // 200MB
 const MAX_FILES_PER_UPLOAD = 20;
+const ACCESS_PASSWORD = process.env.ACCESS_PASSWORD || 'cooluser';
 
 app.disable('x-powered-by');
 app.use(helmet({
@@ -42,8 +43,14 @@ app.use(rateLimit({
 
 app.use(express.static(path.join(__dirname, 'public'), {
   maxAge: '1h',
-  setHeaders(res) {
+  setHeaders(res, filePath) {
     res.setHeader('X-Content-Type-Options', 'nosniff');
+    if (filePath.endsWith('.css')) {
+      res.setHeader('Content-Type', 'text/css; charset=utf-8');
+    }
+    if (filePath.endsWith('.js')) {
+      res.setHeader('Content-Type', 'application/javascript; charset=utf-8');
+    }
   }
 }));
 
@@ -76,6 +83,26 @@ function safeName(input) {
 
 function isAllowedMime(mime) {
   return mime && (mime.startsWith('image/') || mime.startsWith('video/'));
+}
+
+function isTokenValid(token) {
+  if (!token) return false;
+  const left = Buffer.from(String(token));
+  const right = Buffer.from(String(ACCESS_PASSWORD));
+  if (left.length !== right.length) return false;
+  return crypto.timingSafeEqual(left, right);
+}
+
+function getToken(req) {
+  return req.get('x-access-token') || req.query.t || '';
+}
+
+function requireAuth(req, res, next) {
+  if (!isTokenValid(getToken(req))) {
+    res.status(401).json({ error: 'Unauthorized' });
+    return;
+  }
+  next();
 }
 
 function detectFromBuffer(buffer) {
@@ -167,7 +194,7 @@ const upload = multer({
   limits: { fileSize: MAX_FILE_SIZE, files: MAX_FILES_PER_UPLOAD }
 });
 
-app.get('/api/list', (req, res) => {
+app.get('/api/list', requireAuth, (req, res) => {
   const files = meta.files.filter((item) => {
     const full = path.join(UPLOAD_DIR, item.storedName);
     return fs.existsSync(full);
@@ -185,7 +212,7 @@ app.get('/api/list', (req, res) => {
   })));
 });
 
-app.post('/api/upload', upload.array('files', MAX_FILES_PER_UPLOAD), async (req, res, next) => {
+app.post('/api/upload', requireAuth, upload.array('files', MAX_FILES_PER_UPLOAD), async (req, res, next) => {
   try {
     const files = req.files || [];
     const accepted = [];
@@ -248,7 +275,7 @@ app.post('/api/upload', upload.array('files', MAX_FILES_PER_UPLOAD), async (req,
   }
 });
 
-app.get('/api/file/:id', (req, res) => {
+app.get('/api/file/:id', requireAuth, (req, res) => {
   const item = meta.files.find((f) => f.id === req.params.id);
   if (!item) {
     res.status(404).json({ error: 'Not found' });
@@ -267,7 +294,7 @@ app.get('/api/file/:id', (req, res) => {
   res.sendFile(full);
 });
 
-app.get('/api/download/:id', (req, res) => {
+app.get('/api/download/:id', requireAuth, (req, res) => {
   const item = meta.files.find((f) => f.id === req.params.id);
   if (!item) {
     res.status(404).json({ error: 'Not found' });
@@ -283,7 +310,7 @@ app.get('/api/download/:id', (req, res) => {
   res.download(full, item.originalName);
 });
 
-app.get('/api/dump', (req, res) => {
+app.get('/api/dump', requireAuth, (req, res) => {
   const files = meta.files.filter((item) => fs.existsSync(path.join(UPLOAD_DIR, item.storedName)));
   res.setHeader('Content-Type', 'application/zip');
   res.setHeader('Content-Disposition', 'attachment; filename="media-dump.zip"');
@@ -303,6 +330,26 @@ app.get('/api/dump', (req, res) => {
   }
 
   archive.finalize();
+});
+
+app.delete('/api/file/:id', requireAuth, async (req, res, next) => {
+  try {
+    const index = meta.files.findIndex((f) => f.id === req.params.id);
+    if (index === -1) {
+      res.status(404).json({ error: 'Not found' });
+      return;
+    }
+
+    const [item] = meta.files.splice(index, 1);
+    const full = path.join(UPLOAD_DIR, item.storedName);
+    if (fs.existsSync(full)) {
+      await fsp.unlink(full);
+    }
+    await persistMeta();
+    res.json({ ok: true });
+  } catch (err) {
+    next(err);
+  }
 });
 
 app.use((err, req, res, next) => {

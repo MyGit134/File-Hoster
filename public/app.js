@@ -7,8 +7,14 @@ const uploadStatus = document.getElementById('upload-status');
 const gallery = document.getElementById('gallery');
 const statCount = document.getElementById('stat-count');
 const statSize = document.getElementById('stat-size');
+const dumpBtn = document.getElementById('dump-btn');
+const auth = document.getElementById('auth');
+const authInput = document.getElementById('auth-input');
+const authBtn = document.getElementById('auth-btn');
+const authError = document.getElementById('auth-error');
 
 let queue = [];
+let accessToken = localStorage.getItem('mediaAccessToken') || '';
 
 function formatBytes(bytes) {
   if (!bytes) return '0 МБ';
@@ -27,6 +33,30 @@ function setStatus(message, tone = 'neutral') {
   uploadStatus.dataset.tone = tone;
 }
 
+function setAuthError(message) {
+  authError.textContent = message || '';
+}
+
+function setAccessToken(token) {
+  accessToken = token || '';
+  if (accessToken) {
+    localStorage.setItem('mediaAccessToken', accessToken);
+    auth.classList.add('hidden');
+  } else {
+    localStorage.removeItem('mediaAccessToken');
+    auth.classList.remove('hidden');
+  }
+  updateDumpLink();
+}
+
+function updateDumpLink() {
+  if (accessToken) {
+    dumpBtn.href = `/api/dump?t=${encodeURIComponent(accessToken)}`;
+  } else {
+    dumpBtn.href = '#';
+  }
+}
+
 function setQueue(files) {
   queue = Array.from(files || []);
   if (queue.length) {
@@ -38,6 +68,39 @@ function setQueue(files) {
 
 fileInput.addEventListener('change', (event) => {
   setQueue(event.target.files);
+});
+
+authBtn.addEventListener('click', async () => {
+  const token = authInput.value.trim();
+  if (!token) {
+    setAuthError('Введите пароль.');
+    return;
+  }
+
+  setAuthError('');
+  authBtn.disabled = true;
+  try {
+    const response = await fetch('/api/list', {
+      headers: { 'x-access-token': token }
+    });
+    if (!response.ok) {
+      throw new Error('Неверный пароль.');
+    }
+    setAccessToken(token);
+    await loadGallery();
+  } catch (err) {
+    setAccessToken('');
+    setAuthError(err.message);
+  } finally {
+    authBtn.disabled = false;
+  }
+});
+
+authInput.addEventListener('keydown', (event) => {
+  if (event.key === 'Enter') {
+    event.preventDefault();
+    authBtn.click();
+  }
 });
 
 pickBtn.addEventListener('keydown', (event) => {
@@ -69,6 +132,11 @@ dropzone.addEventListener('drop', (event) => {
 });
 
 uploadBtn.addEventListener('click', async () => {
+  if (!accessToken) {
+    setAuthError('Введите пароль.');
+    auth.classList.remove('hidden');
+    return;
+  }
   if (!queue.length) {
     setStatus('Выберите файлы для загрузки.');
     return;
@@ -85,11 +153,16 @@ uploadBtn.addEventListener('click', async () => {
   try {
     const response = await fetch('/api/upload', {
       method: 'POST',
+      headers: { 'x-access-token': accessToken },
       body: formData
     });
 
     const result = await response.json();
     if (!response.ok) {
+      if (response.status === 401) {
+        setAccessToken('');
+        setAuthError('Введите пароль.');
+      }
       throw new Error(result.error || 'Ошибка загрузки');
     }
 
@@ -125,13 +198,13 @@ function createCard(item) {
 
   if (item.type === 'image') {
     const img = document.createElement('img');
-    img.src = item.viewUrl;
+    img.src = `${item.viewUrl}?t=${encodeURIComponent(accessToken)}`;
     img.alt = item.originalName;
     img.loading = 'lazy';
     preview.appendChild(img);
   } else {
     const video = document.createElement('video');
-    video.src = item.viewUrl;
+    video.src = `${item.viewUrl}?t=${encodeURIComponent(accessToken)}`;
     video.controls = true;
     video.preload = 'metadata';
     preview.appendChild(video);
@@ -158,10 +231,34 @@ function createCard(item) {
   const download = document.createElement('a');
   download.className = 'btn';
   download.textContent = 'Скачать';
-  download.href = item.downloadUrl;
+  download.href = `${item.downloadUrl}?t=${encodeURIComponent(accessToken)}`;
+
+  const remove = document.createElement('button');
+  remove.className = 'btn danger';
+  remove.textContent = 'Удалить';
+  remove.type = 'button';
+  remove.addEventListener('click', async () => {
+    if (!confirm('Удалить файл?')) return;
+    remove.disabled = true;
+    try {
+      const response = await fetch(`/api/file/${item.id}`, {
+        method: 'DELETE',
+        headers: { 'x-access-token': accessToken }
+      });
+      if (!response.ok) {
+        throw new Error('Ошибка удаления');
+      }
+      await loadGallery();
+    } catch (err) {
+      setStatus(err.message || 'Ошибка удаления');
+    } finally {
+      remove.disabled = false;
+    }
+  });
 
   actions.appendChild(badge);
   actions.appendChild(download);
+  actions.appendChild(remove);
 
   body.appendChild(title);
   body.appendChild(meta);
@@ -175,8 +272,16 @@ function createCard(item) {
 
 async function loadGallery() {
   gallery.innerHTML = '';
+  if (!accessToken) return;
   try {
-    const response = await fetch('/api/list');
+    const response = await fetch('/api/list', {
+      headers: { 'x-access-token': accessToken }
+    });
+    if (response.status === 401) {
+      setAccessToken('');
+      setAuthError('Введите пароль.');
+      return;
+    }
     const items = await response.json();
     if (!Array.isArray(items) || items.length === 0) {
       const empty = document.createElement('div');
@@ -198,5 +303,10 @@ async function loadGallery() {
   }
 }
 
-loadGallery();
+updateDumpLink();
+if (accessToken) {
+  loadGallery();
+} else {
+  auth.classList.remove('hidden');
+}
 setStatus('Очередь пуста.');
