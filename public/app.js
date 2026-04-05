@@ -36,10 +36,6 @@ function setQueue(files) {
   }
 }
 
-pickBtn.addEventListener('click', () => {
-  fileInput.click();
-});
-
 fileInput.addEventListener('change', (event) => {
   setQueue(event.target.files);
 });
@@ -76,7 +72,8 @@ uploadBtn.addEventListener('click', async () => {
 
   setStatus('Загрузка файлов...');
   uploadBtn.disabled = true;
-  pickBtn.disabled = true;
+  pickBtn.setAttribute('aria-disabled', 'true');
+  pickBtn.classList.add('disabled');
 
   try {
     const response = await fetch('/api/upload', {
@@ -103,7 +100,8 @@ uploadBtn.addEventListener('click', async () => {
     setStatus(`Ошибка: ${err.message}`);
   } finally {
     uploadBtn.disabled = false;
-    pickBtn.disabled = false;
+    pickBtn.removeAttribute('aria-disabled');
+    pickBtn.classList.remove('disabled');
   }
 });
 
