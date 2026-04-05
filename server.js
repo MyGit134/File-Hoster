@@ -15,6 +15,15 @@ const META_PATH = path.join(UPLOAD_DIR, 'meta.json');
 const MAX_FILE_SIZE = 200 * 1024 * 1024; // 200MB
 const MAX_FILES_PER_UPLOAD = 20;
 
+let fileTypeFromFile;
+const fileTypeReady = import('file-type')
+  .then((mod) => {
+    fileTypeFromFile = mod.fileTypeFromFile;
+  })
+  .catch((err) => {
+    console.error('Failed to load file-type module:', err);
+  });
+
 app.disable('x-powered-by');
 app.use(helmet({
   crossOriginResourcePolicy: { policy: 'same-site' },
@@ -83,7 +92,9 @@ const storage = multer.diskStorage({
     cb(null, UPLOAD_DIR);
   },
   filename(req, file, cb) {
-    const id = crypto.randomUUID();
+    const id = typeof crypto.randomUUID === 'function'
+      ? crypto.randomUUID()
+      : crypto.randomBytes(16).toString('hex');
     file.__id = id;
     cb(null, `${id}.upload`);
   }
@@ -114,7 +125,11 @@ app.get('/api/list', (req, res) => {
 
 app.post('/api/upload', upload.array('files', MAX_FILES_PER_UPLOAD), async (req, res, next) => {
   try {
-    const { fileTypeFromFile } = await import('file-type');
+    await fileTypeReady;
+    if (typeof fileTypeFromFile !== 'function') {
+      res.status(500).json({ error: 'Upload processor unavailable' });
+      return;
+    }
     const files = req.files || [];
     const accepted = [];
     const rejected = [];
